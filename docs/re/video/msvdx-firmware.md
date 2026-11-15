@@ -182,6 +182,21 @@ words. Full source spans, alignment, reference-picture ownership and output
 planes still need validation by the native submission boundary. These static
 locators do not authorize reuse of the vendor's unchecked relocation ioctl.
 
+### PSB render operation flags
+
+The producer adds flags at final publication, after constructing the render
+message. At `0x6138..0x617c`, it ORs `0x4000` into byte 28 of the last message
+in the batch (`0x2000` for earlier messages). It also ORs `0x0800` when context
+field `0x104` equals 2. The MPEG-2 path sets that field to 2 at `0x7735`.
+The matched kernel consumer preserves these flags.
+
+The comparative AOSP `dxva_fw_flags.h` names the old render flag
+`FW_VA_RENDER_IS_VLD_NOT_MC`. Its newer DEVA profile assigns another meaning
+to the same bit; that meaning does not apply to this PSB render envelope.
+Poulsback submits each slice as a one-message batch, so byte 28 must contain
+`0x4800`: VLD operation and a host completion interrupt. The VLD DMA profile
+alone does not select the firmware operation.
+
 ### PSB context tags
 
 The same PSB producer builds a context tag at `0x36df..0x36ec` from the low

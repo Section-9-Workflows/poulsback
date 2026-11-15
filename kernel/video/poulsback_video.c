@@ -57,6 +57,8 @@
 #define V_REPLY_RING 0x2ce0
 #define V_COMMAND_RING 0x2e70
 #define V_RING_WORDS 100U
+#define V_RENDER_VLD 0x0800U
+#define V_RENDER_HOST_INT 0x4000U
 /* PSB uses a nonzero process/context tag; this engine owns one private context. */
 #define V_CONTEXT 0x00010001U
 
@@ -325,7 +327,8 @@ static int send_slice(struct video_engine *v, u32 bytes, u32 dma, u32 mode, u32 
 	message[0] = 0x8120 | bytes << 16;
 	message[1] = poulsback_vm_directory(v->vm) | 1;
 	message[2] = dma; message[3] = V_CONTEXT; message[4] = seq;
-	message[5] = mode; message[6] = last_mb << 16; message[7] = 0x4000;
+	message[5] = mode; message[6] = last_mb << 16;
+	message[7] = V_RENDER_VLD | V_RENDER_HOST_INT;
 	for (i = 0; i < padding; i++)
 		wr(v, V_COMMAND_RING + 4 * w++, i ? 0 : padding * 4);
 	w %= V_RING_WORDS;
@@ -360,7 +363,7 @@ static int send_slice(struct video_engine *v, u32 bytes, u32 dma, u32 mode, u32 
 					head >> 8 & 255, reply[1], reply[2], V_CONTEXT);
 				return -EIO;
 			}
-			if ((head >> 8 & 255) != 0xc0 || reply[1] != seq || !(reply[2] & 0x4000)) {
+			if ((head >> 8 & 255) != 0xc0 || reply[1] != seq || !(reply[2] & V_RENDER_HOST_INT)) {
 				drm_err(v->dev, "MSVDX reply %08x fence %u status %08x, expected %u\n",
 					head, reply[1], reply[2], seq);
 				return -EIO;
