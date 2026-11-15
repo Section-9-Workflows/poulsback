@@ -147,4 +147,6 @@ remain owned by the caller across pictures; completion does not free them.
 An unknown outcome freezes mappings and retains the job until reboot. No reset,
 retry or CPU fallback follows it. System sleep parks submissions and powers
 video down only after known idle; resume reloads firmware before reopening
-submission. Initial video use retains the module for the boot, as SGX use does.
+submission. Initial video use retains the module and a separate claim on the shared PCI
+power domain for the boot, as SGX use does. Both claims block runtime removal
+or unmanaged power-off; system sleep drains both engines.

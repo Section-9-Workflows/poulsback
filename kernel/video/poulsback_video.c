@@ -116,6 +116,7 @@ static int hold(struct video_engine *v, int error, const char *where)
 	error = POULSBACK_ERRSITE(error);
 	v->lost = true;
 	poulsback_vm_freeze();
+	sgx535_epoch_lost(v->dev, SGX535_EPOCH_FAULT);
 	drm_err(v->dev, "MSVDX %s failed (%d); resources retained until reboot\n", where, error);
 	return error;
 }
@@ -279,11 +280,16 @@ static struct video_engine *engine_get(struct drm_device *dev)
 		ret = -ENOMEM;
 		goto free;
 	}
+	ret = sgx535_epoch_video_claim(dev);
+	if (ret)
+		goto free;
 	__module_get(THIS_MODULE);
 	v->claimed = true;
 	video = v;
 	return v;
 free:
+	if (v->regs)
+		iounmap(v->regs);
 	if (v->vm) {
 		if (!memory_free(v, &v->command) || !memory_free(v, &v->rendec)) {
 			__module_get(THIS_MODULE);
@@ -478,6 +484,10 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 	for (i = 0; i < 3; i++)
 		if (job->surfaces[i].bo && job->surfaces[i].cached)
 			flush_pages(job->surfaces[i].pages, job->surfaces[i].count);
+	if (poulsback_vm_held(v->vm)) {
+		ret = -EIO;
+		goto done;
+	}
 	if (!v->ready) {
 		ret = boot(v);
 		if (ret) {
@@ -487,6 +497,10 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 	}
 	for (i = 0; i < p->slice_count; i++) {
 		u32 dma, bytes, rows;
+		if (poulsback_vm_held(v->vm)) {
+			ret = -EIO;
+			goto done;
+		}
 		bytes = poulsback_mpeg2_commands(p, &slices[i], previous, addresses,
 					       v->command.node.start, job->bitstream.node.start,
 					       v->command.map, &dma);
