@@ -115,7 +115,72 @@ The `.text` locations are section offsets, not live virtual addresses.
 Envelope words, GPU VAs, kernel aliases and MTX addresses are different
 namespaces. Numeric subtraction between them does not prove an LLDMA mapping,
 DMA extent or external-reference ownership. The per-slice address linkage
-and any buffer-size field's hardware unit need their own producer/consumer join.
+needs its own producer/consumer join. The PSB render-size producer below does
+not establish EMGD's corresponding unit.
+
+## PSB render sizes and DMA addresses
+
+The xpsb-glx 0.18 `psb_drv_video.so` is 188,948 bytes, SHA-256
+`f0103b67f8c7bc522fe67bdb0d0fc47c0e15cd1a08963aebe07e1a1176c6495b`.
+The reference collection contains identical copies in the original source
+archive and Ubuntu 10.04 PSB stack. Its x86 code gives the producer-side
+contracts below. All locations are ELF virtual addresses, not live pointers.
+This identifies host command construction, not executing MTX firmware or
+successful decoding.
+
+### Render buffer size counts bytes
+
+The render producer at `0x6890` reads command-start and command-end pointers
+from object offsets `0x114` and `0x118`. With no continuation segment, the branch
+at `0x6a48` subtracts these pointers without a shift. With continuation segments,
+it uses the saved first-segment length at offset `0x148`. The segment builder
+at `0x5bb0` saves that length as a byte-pointer difference, including the eight
+bytes it reserves for the continuation command.
+
+The producer at `0x698a..0x699d` writes that byte count into the low 12 bits of
+the render halfword at byte 2. It does not divide by four. The kernel consumer
+`psb_msvdx_map_command` in the same stack's `psb-kernel-source-4.42.0/psb_msvdx.c`
+(SHA-256 `6870b7822b7c6017c2150868eff4052275c6232c26c4b97aee3ed391bf7b2f0d`)
+patches the fence and PTD but leaves this halfword unchanged.
+
+This differs from the comparative AOSP `dfc4b4b` implementation:
+`psb_cmdbuf.c` writes `cmdbuffer_size / 4` to `FW_DEVA_DECODE_BUFFER_SIZE`.
+That is a different message profile. Its word count must not replace the byte
+count in this PSB `0x81` render message. The separate message header at byte 0
+still counts envelope bytes; host-ring indices count DWORDs.
+
+### Render commands point through an LLDMA record
+
+The render producer passes the command allocation, command-start byte offset
+and segment byte count to the helper at `0x5a00`. The helper returns the
+new LLDMA record's byte offset within that allocation. The relocation call
+at `0x6953..0x6985` places the full device address of that record in render
+byte 8. It is not the address of the first register command.
+
+The record builder at `0x5750` reserves 32 bytes per record. It clears each
+record, writes the device destination at byte 8, and relocates the source
+allocation address into byte 24. It divides the supplied byte count by the
+selected peripheral width before writing the transfer count at byte 4.
+The width lookup at `0x20660` is `{4, 2, 1}` bytes. Transfers larger than
+65,535 peripheral units create another record; the next-record address at
+byte 28 is encoded as `device_address >> 4`. The last record clears that
+address and sets bit 31 of the word at byte 4.
+
+The producer's eight-word DMA profiles begin at `0x20500`. Relevant entries are:
+
+| Profile index | Device destination | Peripheral width | MMU group |
+| ---: | ---: | ---: | ---: |
+| 0, VLC table | `0x3000` | 2 bytes | 0 |
+| 1, bitstream | `0x0820` | 1 byte | 0 |
+| 3, MC command buffer | `0x0350` | 4 bytes | 1 |
+| 4, VLD command buffer | `0x0350` | 4 bytes | 0 |
+
+The render caller selects profile 4 when its context field at offset `0x104`
+equals 2; otherwise it selects profile 3. The bitstream address is carried by
+its own LLDMA source relocation, separate from the three shift-register setup
+words. Full source spans, alignment, reference-picture ownership and output
+planes still need validation by the native submission boundary. These static
+locators do not authorize reuse of the vendor's unchecked relocation ioctl.
 
 ## Ring and reply semantics
 
