@@ -229,3 +229,13 @@ Fence assignment, observed completion, CPU/display visibility and last
 reference use are separate facts. Neither a successful firmware-init call nor
 correct decoded planes closes those missing joins. The broader
 [decode pipeline](decode-pipeline.md) describes the output and lifetime limits.
+
+## MSVDX memory-fault diagnostics
+
+The EMGD 1.8 source `emgd/include/msvdx.h` identifies the MSVDX MMU status
+register at block offset `0x068c`. Its `msvdx.c` fault handler reads that register
+when interrupt status contains `0x00000f00`. The comparative AOSP core header
+places the fault page address in bits 31:12 and access status in bit 0.
+Poulsback records this status, the current page-table entries and the job's
+mapped ranges when a memory fault occurs. These reads do not clear the fault,
+reset the engine or authorize releasing its mappings.

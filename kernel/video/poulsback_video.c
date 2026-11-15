@@ -39,6 +39,7 @@
 #define V_IRQ_ENABLE 0x0610
 #define V_CLOCK 0x0620
 #define V_MMU_CONTROL 0x0680
+#define V_MMU_STATUS 0x068c
 #define V_BANK 0x06f0
 #define V_RENDEC_CONTROL0 0x0868
 #define V_RENDEC_CONTROL1 0x086c
@@ -342,8 +343,13 @@ static int send_slice(struct video_engine *v, u32 bytes, u32 dma, u32 mode, u32 
 	deadline = jiffies + msecs_to_jiffies(2000);
 	for (;;) {
 		irq = rd(v, V_IRQ_STATUS);
-		if (irq & 0xf00)
+		if (irq & 0xf00) {
+			u32 status = rd(v, V_MMU_STATUS), pde, pte;
+			poulsback_vm_peek(v->vm, status & PAGE_MASK, &pde, &pte);
+			drm_err(v->dev, "MSVDX MMU fault: irq=%08x status=%08x fence=%u pde=%08x pte=%08x\n",
+				irq, status, seq, pde, pte);
 			return -EIO;
+		}
 		r = rd(v, V_REPLY_READ); w = rd(v, V_REPLY_WRITE);
 		if (r >= V_RING_WORDS || w >= V_RING_WORDS)
 			return -EPROTO;
@@ -528,6 +534,10 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 				p->width, p->height, p->coding_type, p->flags, p->coding_extension,
 				p->f_code, i + 1, p->slice_count, slices[i].vertical_position,
 				slices[i].bytes, slices[i].macroblock_offset, slices[i].quantiser_scale_code);
+			drm_err(dev, "MSVDX mappings: stream=%08llx+%llx surfaces=%08x,%08x,%08x bytes=%llu command=%08llx rendec=%08llx+%llx\n",
+				job->bitstream.node.start, job->bitstream.node.size,
+				addresses[0], addresses[1], addresses[2], job->surfaces[0].node.size,
+				v->command.node.start, v->rendec.node.start, v->rendec.node.size);
 			hold(v, ret, "decode");
 			goto done;
 		}
