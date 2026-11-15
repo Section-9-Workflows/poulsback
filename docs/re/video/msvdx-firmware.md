@@ -206,6 +206,21 @@ Poulsback keeps this allocation extent for compressed input and clears the
 padding. Slice validation and DMA lengths still use the logical payload size;
 allocated padding does not extend the accepted bitstream.
 
+The matching PSB 4.42 kernel defaults `drm_psb_trap_pagefaults` to zero in
+`psb_drv.c:40` and passes it to `psb_mmu_driver_init` at lines 609–612.
+`psb_mmu_alloc_pd` in `psb_mmu.c:224–267` then fills unused PDEs and PTEs
+with mappings to a cleared dummy page. BO bindings use this default directory
+through `drm_psb_tbe_bind` in `psb_buffer.c`. Reads beyond a BO can therefore
+reach zeros in that driver instead of faulting on an unmapped page.
+
+Poulsback keeps one cleared tail page after the 32-KiB-rounded compressed
+input allocation. This bounds the compatibility mapping to the page immediately
+after the input; other unused addresses remain unmapped. The tail belongs to
+the job and follows its normal completion or HOLD lifetime. Logical payload,
+slice bounds and DMA lengths remain unchanged. This differs from PSB's mapping
+of every unused address and still needs device qualification; it does not
+establish a general MSVDX read-ahead limit or malformed-input recovery.
+
 ### PSB context tags
 
 The same PSB producer builds a context tag at `0x36df..0x36ec` from the low

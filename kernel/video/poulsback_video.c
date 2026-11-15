@@ -479,8 +479,10 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 		addresses[i] = s->node.start;
 		bos[count++] = s->bo;
 	}
-	/* PSB rounds slice-data BOs to 32 KiB; MSVDX can fetch beyond the payload. */
-	ret = memory_alloc(v, &job->bitstream, ALIGN(p->bitstream_bytes, 32U << 10));
+	/* PSB maps unused addresses to a cleared page. Keep one zero tail page
+	 * for reads past the input allocation, without mapping every unused VA. */
+	ret = memory_alloc(v, &job->bitstream,
+			   ALIGN(p->bitstream_bytes, 32U << 10) + PAGE_SIZE);
 	if (ret)
 		goto done;
 	memcpy(job->bitstream.map, stream, p->bitstream_bytes);
@@ -535,8 +537,9 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 				p->width, p->height, p->coding_type, p->flags, p->coding_extension,
 				p->f_code, i + 1, p->slice_count, slices[i].vertical_position,
 				slices[i].bytes, slices[i].macroblock_offset, slices[i].quantiser_scale_code);
-			drm_err(dev, "MSVDX mappings: stream=%08llx+%llx surfaces=%08x,%08x,%08x bytes=%llu command=%08llx rendec=%08llx+%llx\n",
+			drm_err(dev, "MSVDX mappings: stream=%08llx+%llx payload=%u slice_offset=%u surfaces=%08x,%08x,%08x bytes=%llu command=%08llx rendec=%08llx+%llx\n",
 				job->bitstream.node.start, job->bitstream.node.size,
+				p->bitstream_bytes, slices[i].offset,
 				addresses[0], addresses[1], addresses[2], job->surfaces[0].node.size,
 				v->command.node.start, v->rendec.node.start, v->rendec.node.size);
 			hold(v, ret, "decode");
