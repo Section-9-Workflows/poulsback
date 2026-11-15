@@ -12,6 +12,7 @@ int poulsback_mpeg2_validate(const struct poulsback_mpeg2_decode *p,
 			   const struct poulsback_mpeg2_slice *s, const u8 *data)
 {
 	u32 i, end = 0;
+	u32 rows;
 	if (p->abi != POULSBACK_VIDEO_ABI || (p->flags & ~POULSBACK_MPEG2_PROGRESSIVE_SEQUENCE) || p->reserved[0] ||
 	    p->reserved[1] || p->reserved[2] || !p->output ||
 	    !p->width || !p->height || ((p->width | p->height) & 1) ||
@@ -32,20 +33,32 @@ int poulsback_mpeg2_validate(const struct poulsback_mpeg2_decode *p,
 	    (p->coding_type == 3 && !p->backward_reference) ||
 	    p->output == p->forward_reference || p->output == p->backward_reference)
 		return -EINVAL;
+	for (i = 0; i < (p->coding_type == 3 ? 4 : p->coding_type == 2 ? 2 : 0); i++) {
+		u32 code = (p->f_code >> (12 - 4 * i)) & 15;
+		if (!code || code > 9)
+			return -EINVAL;
+	}
 	for (i = 0; i < 64; i++)
 		if (!p->intra_matrix[i] || !p->non_intra_matrix[i])
 			return -EINVAL;
+	rows = ALIGN(p->height, p->flags & POULSBACK_MPEG2_PROGRESSIVE_SEQUENCE ? 16 : 32) / 16;
 	for (i = 0; i < p->slice_count; i++) {
 		const struct poulsback_mpeg2_slice *v = &s[i];
+		u32 bit = 37;
 		if (v->reserved || v->bytes < 5 || v->bytes > 29U * 65535U || v->offset < end ||
 		    v->offset > p->bitstream_bytes || v->bytes > p->bitstream_bytes - v->offset ||
-		    v->vertical_position >= DIV_ROUND_UP(p->height, 16) ||
+		    v->vertical_position >= rows ||
 		    v->vertical_position >= 128 ||
 		    v->macroblock_offset < 38 || (u64)v->macroblock_offset >= (u64)v->bytes * 8 ||
 		    v->quantiser_scale_code < 1 || v->quantiser_scale_code > 31)
 			return -EINVAL;
 		if (get_unaligned_be32(data + v->offset) != 0x100 + v->vertical_position + 1 ||
 		    data[v->offset + 4] >> 3 != v->quantiser_scale_code)
+			return -EINVAL;
+		while (bit < v->bytes * 8 &&
+		       (data[v->offset + bit / 8] & (128U >> (bit % 8))))
+			bit += 9;
+		if (++bit != v->macroblock_offset || bit >= v->bytes * 8)
 			return -EINVAL;
 		end = v->offset + v->bytes;
 	}
