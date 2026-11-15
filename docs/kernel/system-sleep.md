@@ -65,7 +65,7 @@ native resume path.
 
 The files are in the project's
 [reference collection v2](https://github.com/ishad0w/poulsback/releases/tag/v0.0.1%2Balpha%2Bpoulsback-reference-collection-v2),
-under the EMGD 1.8 source root listed in [Evidence](../re/evidence.md#select-a-source).
+under the EMGD 1.8 source root listed in [Evidence](../re/evidence.md#select-a-source-file).
 Their SHA-256 identities are:
 
 | File | SHA-256 |
