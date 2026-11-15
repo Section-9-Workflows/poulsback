@@ -9,7 +9,8 @@ device qualification before it can be described as reliable suspend/resume.
 
 ## Entry and return
 
-Linux switches to its suspend console before freezing userspace. Native KMS
+The fbdev setup clears the DRM helper’s `skip_vt_switch` default. Linux then
+switches to its suspend console before freezing userspace. Native KMS
 clients must release their plane and restore the inherited framebuffer during
 that switch. `prepare` rejects typed scanout, retained failures and unfinished
 display transitions. It parks the GPU schedulers, drains accepted hardware

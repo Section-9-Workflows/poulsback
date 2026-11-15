@@ -67,7 +67,17 @@
  	int size;
  	int ret;
  	struct psb_gem_object *backing;
-@@ -297,6 +305,14 @@
+@@ -231,6 +239,9 @@
+ 		ret = PTR_ERR(info);
+ 		goto err_drm_gem_object_put;
+ 	}
++
++	/* Native KMS clients must release scanout before system sleep. */
++	info->skip_vt_switch = false;
+ 
+ 	mode_cmd.pixel_format = drm_mode_legacy_fb_format(bpp, depth);
+ 
+@@ -297,6 +308,14 @@
  	if (obj == NULL)
  		return ERR_PTR(-ENOENT);
  
