@@ -42,8 +42,8 @@ bool sgx535_epoch_external_active(struct drm_device *);
  * releases it (its memory freed, the SGX powered down). */
 int sgx535_epoch_executor_claim(struct drm_device *);
 void sgx535_epoch_executor_release(struct drm_device *);
-/* Video owns the same PCI power domain but keeps a separate decode address space.
- * Its claim remains for the boot; system sleep uses the video quiesce path. */
+/* Video shares the PCI power domain and has its own decode address space.
+ * It keeps its claim for the rest of the boot. System sleep quiesces video. */
 int sgx535_epoch_video_claim(struct drm_device *);
 /* IRQ-safe, monotonic, permanent admission loss. */
 void sgx535_epoch_lost(struct drm_device *, u32 reason);

@@ -60,7 +60,7 @@
 #define V_RING_WORDS 100U
 #define V_RENDER_VLD 0x0800U
 #define V_RENDER_HOST_INT 0x4000U
-/* PSB uses a nonzero process/context tag; this engine owns one private context. */
+/* Use a nonzero PSB process/context tag for this engine's private context. */
 #define V_CONTEXT 0x00010001U
 
 struct video_memory {

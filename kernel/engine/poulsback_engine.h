@@ -35,8 +35,9 @@ void poulsback_engine_link_vm(struct poulsback_engine *engine, struct poulsback_
  * the engine to drain (two job timeouts and 100 ms, then it wedges), read
  * the idle registers; -EBUSY, the schedulers unparked and the engine as it
  * is, when lost, holding a job or not idle. Power-down: EMGD's deinit
- * writes, only after quiesce. System sleep uses both helpers. Release: after quiesce, with the engine ready and no
- * hardware fence alive, stop the schedulers, unbind the IRQ route, free every
+ * writes, only after quiesce. System sleep uses both helpers and keeps the
+ * allocations. Release: after quiesce, with the engine ready and no hardware
+ * fence alive, stop the schedulers, unbind the IRQ route, free every
  * page, release the claim and drop the engine's module reference (taken at
  * its claim); -EBUSY otherwise, freeing nothing. */
 int poulsback_engine_quiesce(struct drm_device *dev);

@@ -1200,7 +1200,7 @@ static int engine_program(struct poulsback_engine *e)
 	writel((u32)page_to_phys(e->directory), regs + REG_BIF_BASE15);
 	writel(ENGINE_BANK0_IDLE, regs + REG_BIF_BANK0);
 	writel(POULSBACK_VM_PARAM_VA, regs + REG_TA_REQ_BASE);
-	/* Probe uses the PCI aperture base. Owned 2D buffers use our VM range. */
+	/* Owned 2D buffers use our VM range, so replace the PCI aperture base from probe. */
 	writel(POULSBACK_VM_TWOD_REQ_BASE, regs + REG_TWOD_REQ_BASE);
 	if (readl(regs + REG_TWOD_REQ_BASE) != POULSBACK_VM_TWOD_REQ_BASE)
 		return POULSBACK_ERRSITE(-EIO);
@@ -1293,12 +1293,12 @@ int poulsback_engine_quiesce(struct drm_device *dev)
 	if (r == POULSBACK_TEARDOWN_BUSY)
 		engine_wedge(e, POULSBACK_ERRSITE(-ETIMEDOUT));
 	if (!r) {
-		/* Completed slots can still have work returning from their callback. */
+		/* A slot can report completion before its work callback returns. */
 		flush_workqueue(e->wq);
 		flush_workqueue(e->wq2d);
 		cancel_delayed_work_sync(&e->sched.work_tdr);
 		cancel_delayed_work_sync(&e->sched2d.work_tdr);
-		/* Already parked; the scheduler frees completed jobs after wake. */
+		/* Both schedulers are already parked. They free completed jobs after wake. */
 		s = engine_teardown_state(e);
 		r = poulsback_teardown_drained(&s);
 	}

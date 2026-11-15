@@ -2525,7 +2525,7 @@ int poulsback_display_psb_sleep_check(struct drm_device *dev, bool resumed)
 			if (o->base.images[i].image)
 				o->base.images[i].frame = at.frame;
 		mutex_unlock(&o->domain.lock);
-		/* Match the normal retirement allowance before frozen work can run. */
+		/* Allow the usual retirement interval while retirement work is frozen. */
 		expires = jiffies + msecs_to_jiffies(200);
 		while (o->base.count) {
 			ret = psb_base_frames_after(&o->base, at.frame);
