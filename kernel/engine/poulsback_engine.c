@@ -1298,8 +1298,7 @@ int poulsback_engine_quiesce(struct drm_device *dev)
 		flush_workqueue(e->wq2d);
 		cancel_delayed_work_sync(&e->sched.work_tdr);
 		cancel_delayed_work_sync(&e->sched2d.work_tdr);
-		drm_sched_stop(&e->sched, NULL);
-		drm_sched_stop(&e->sched2d, NULL);
+		/* Already parked; the scheduler frees completed jobs after wake. */
 		s = engine_teardown_state(e);
 		r = poulsback_teardown_drained(&s);
 	}
