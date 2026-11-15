@@ -197,6 +197,15 @@ Poulsback submits each slice as a one-message batch, so byte 28 must contain
 `0x4800`: VLD operation and a host completion interrupt. The VLD DMA profile
 alone does not select the firmware operation.
 
+### PSB compressed-input allocation extent
+
+The matched PSB host producer rounds buffer allocation sizes to 32 KiB at
+`0x2ed7..0x2ee0` before the BO-create call at `0x2f00`. The comparative AOSP
+`psb__allocate_BO_buffer` uses the same rounding for slice-data buffers.
+Poulsback keeps this allocation extent for compressed input and clears the
+padding. Slice validation and DMA lengths still use the logical payload size;
+allocated padding does not extend the accepted bitstream.
+
 ### PSB context tags
 
 The same PSB producer builds a context tag at `0x36df..0x36ec` from the low

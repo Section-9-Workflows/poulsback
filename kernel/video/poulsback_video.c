@@ -479,7 +479,8 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 		addresses[i] = s->node.start;
 		bos[count++] = s->bo;
 	}
-	ret = memory_alloc(v, &job->bitstream, p->bitstream_bytes);
+	/* PSB rounds slice-data BOs to 32 KiB; MSVDX can fetch beyond the payload. */
+	ret = memory_alloc(v, &job->bitstream, ALIGN(p->bitstream_bytes, 32U << 10));
 	if (ret)
 		goto done;
 	memcpy(job->bitstream.map, stream, p->bitstream_bytes);
