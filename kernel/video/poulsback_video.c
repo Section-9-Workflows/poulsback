@@ -57,6 +57,8 @@
 #define V_REPLY_RING 0x2ce0
 #define V_COMMAND_RING 0x2e70
 #define V_RING_WORDS 100U
+/* PSB uses a nonzero process/context tag; this engine owns one private context. */
+#define V_CONTEXT 0x00010001U
 
 struct video_memory {
 	struct page **pages;
@@ -322,7 +324,7 @@ static int send_slice(struct video_engine *v, u32 bytes, u32 dma, u32 mode, u32 
 		return -EBUSY;
 	message[0] = 0x8120 | bytes << 16;
 	message[1] = poulsback_vm_directory(v->vm) | 1;
-	message[2] = dma; message[3] = 0; message[4] = seq;
+	message[2] = dma; message[3] = V_CONTEXT; message[4] = seq;
 	message[5] = mode; message[6] = last_mb << 16; message[7] = 0x4000;
 	for (i = 0; i < padding; i++)
 		wr(v, V_COMMAND_RING + 4 * w++, i ? 0 : padding * 4);
@@ -353,6 +355,11 @@ static int send_slice(struct video_engine *v, u32 bytes, u32 dma, u32 mode, u32 
 			}
 			wr(v, V_REPLY_READ, r);
 			wr(v, V_IRQ_CLEAR, irq & 0x4000);
+			if ((head >> 8 & 255) == 0xc5 || (head >> 8 & 255) == 0xc7) {
+				drm_err(v->dev, "MSVDX firmware failure: id=%02x fence=%u irq=%08x context=%08x\n",
+					head >> 8 & 255, reply[1], reply[2], V_CONTEXT);
+				return -EIO;
+			}
 			if ((head >> 8 & 255) != 0xc0 || reply[1] != seq || !(reply[2] & 0x4000)) {
 				drm_err(v->dev, "MSVDX reply %08x fence %u status %08x, expected %u\n",
 					head, reply[1], reply[2], seq);
@@ -513,6 +520,11 @@ int poulsback_mpeg2_decode_ioctl(struct drm_device *dev, void *data, struct drm_
 		ret = send_slice(v, bytes, dma, poulsback_mpeg2_mode(p),
 				(rows - 1) << 8 | (DIV_ROUND_UP(p->width, 16) - 1));
 		if (ret) {
+			drm_err(dev, "MSVDX picture %ux%u type=%u flags=%x extension=%x fcode=%04x "
+				"slice=%u/%u row=%u bytes=%u bit=%u quant=%u\n",
+				p->width, p->height, p->coding_type, p->flags, p->coding_extension,
+				p->f_code, i + 1, p->slice_count, slices[i].vertical_position,
+				slices[i].bytes, slices[i].macroblock_offset, slices[i].quantiser_scale_code);
 			hold(v, ret, "decode");
 			goto done;
 		}

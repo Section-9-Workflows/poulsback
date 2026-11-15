@@ -182,6 +182,22 @@ words. Full source spans, alignment, reference-picture ownership and output
 planes still need validation by the native submission boundary. These static
 locators do not authorize reuse of the vendor's unchecked relocation ioctl.
 
+### PSB context tags
+
+The same PSB producer builds a context tag at `0x36df..0x36ec` from the low
+16 bits of its VA context ID and a process-derived upper halfword
+(`getpid() << 16` at `0x4858..0x4863`). It writes
+that tag at render byte 12 (`0x6909..0x6912`). The matched kernel consumer
+preserves it while patching the fence and directory. Normal userspace decoder
+contexts therefore carry a nonzero tag; zero is not the native producer's
+first-context convention.
+
+The native kernel decoder owns one serialized engine and private address
+space, so it uses one nonzero opaque tag, `0x00010001`. This preserves the
+producer's tag form without exporting process IDs or accepting userspace tags.
+Whether a zero tag caused a particular device failure still requires a matched
+physical run; static construction alone does not establish firmware behavior.
+
 ## Ring and reply semantics
 
 The selected source orders transport as checked ring space → copy message
